@@ -1,3 +1,39 @@
+SUBTYPES.DATA = list(
+  list(name='aml', only.primary=F, is.rna.seq=T, is.mirna.seq=T, display.name='AML'),
+  list(name='breast', only.primary=T, is.rna.seq=T, is.mirna.seq=T, display.name='BIC'),
+  list(name='colon', only.primary=T, is.rna.seq=T, is.mirna.seq=T, display.name='COAD'),
+  list(name='gbm', only.primary=T, is.rna.seq=F, is.mirna.seq=F, display.name='GBM'),
+  list(name='kidney', only.primary=T, is.rna.seq=T, is.mirna.seq=T, display.name='KIRC'),
+  list(name='liver', only.primary=T, is.rna.seq=T, is.mirna.seq=T, display.name='LIHC'),
+  list(name='lung', only.primary=T, is.rna.seq=T, is.mirna.seq=T, display.name='LUSC'),
+  list(name='melanoma', only.primary=F, is.rna.seq=T, is.mirna.seq=T, display.name='SKCM'),
+  list(name='ovarian', only.primary=T, is.rna.seq=T, is.mirna.seq=T, display.name='OV'),
+  list(name='sarcoma', only.primary=T, is.rna.seq=T, is.mirna.seq=T, display.name='SARC'))
+
+ALGORITHM.NAMES = c('kmeans', 'spectral', 'lracluster', 'pins', 'snf', 'mkl', 
+                     'mcca', 'nmf', 'iCluster')
+ALGORITHM.DISPLAY.NAMES = as.list(c('K-means', 'Spectral', 'LRAcluster', 'PINS', 
+                           'SNF', 'rMKL-LPP', 'MCCA', 'MultiNMF', 'iClusterBayes'))
+names(ALGORITHM.DISPLAY.NAMES) = ALGORITHM.NAMES
+
+get.clustering.results.dir.path <- function() {
+  return('')
+}
+
+get.empirical.pvalue.path <- function(subtype, algorithm) {
+  emp.results.dir = ''
+  res.path = file.path(emp.results.dir, 
+                       sprintf('%s_%s', subtype, algorithm))
+}
+
+get.sim.results.dir <- function() {
+  return('')
+}
+
+get.dataset.dir.path <- function() {
+  return('')
+}
+
 get.clustering.results.file.path = function(subtype, alg.name) {
   results.path = get.clustering.results.dir.path()
   clustering.file.name = paste(subtype, alg.name, 'all', sep='_')
@@ -6,11 +42,164 @@ get.clustering.results.file.path = function(subtype, alg.name) {
               surv=file.path(results.path, survival.file.name)))
 }
 
-
 get.figure.dir = function() {
   results.path = get.clustering.results.dir.path()
   return(file.path(results.path, 'logrank_letter_figures'))
 }
+
+get.subtype.survival.path <- function(subtype) {
+  datasets.path = get.dataset.dir.path()
+  survival.file.path = file.path(datasets.path, subtype, 'survival')
+  return(survival.file.path)
+}
+
+get.surv.data <- function(groups, subtype, survival.file.path) {
+  if (missing(survival.file.path)) {
+    survival.file.path = get.subtype.survival.path(subtype)
+  }
+  survival.data = read.table(survival.file.path, header = TRUE)
+  patient.names = names(groups)
+  patient.names.in.file = as.character(survival.data[, 1])
+  patient.names.in.file = toupper(gsub('-', '\\.', substring(patient.names.in.file, 1, 12)))
+
+  stopifnot(all(patient.names %in% patient.names.in.file))
+  
+  indices = match(patient.names, patient.names.in.file)
+  ordered.survival.data = survival.data[indices,]
+  ordered.survival.data["cluster"] <- groups
+  ordered.survival.data$Survival[is.na(ordered.survival.data$Survival)] = 0
+  ordered.survival.data$Death[is.na(ordered.survival.data$Death)] = 0
+  return(ordered.survival.data)
+  
+}
+
+check.survival.coin <- function(groups, subtype) {
+  return(check.survival(groups, subtype, is.coin=T))
+}
+
+check.survival <- function(groups, subtype, survival.file.path, is.coin=F) {
+  if (missing(survival.file.path)) {
+    survival.file.path = get.subtype.survival.path(subtype)
+  }
+  survival.data = read.table(survival.file.path, header = TRUE)
+  patient.names = names(groups)
+  patient.names.in.file = as.character(survival.data[, 1])
+  patient.names.in.file = toupper(gsub('-', '\\.', substring(patient.names.in.file, 1, 12)))
+
+  stopifnot(all(patient.names %in% patient.names.in.file))
+  
+  indices = match(patient.names, patient.names.in.file)
+  ordered.survival.data = survival.data[indices,]
+  ordered.survival.data["cluster"] <- groups
+  ordered.survival.data$Survival[is.na(ordered.survival.data$Survival)] = 0
+  ordered.survival.data$Death[is.na(ordered.survival.data$Death)] = 0
+  if (is.coin) {
+    ordered.survival.data$cluster <- as.factor(ordered.survival.data$cluster)
+    return(coin::logrank_test(Surv(Survival, Death) ~ cluster, data=ordered.survival.data, distribution='asymptotic'))
+  } else {
+    return(survdiff(Surv(Survival, Death) ~ cluster, data=ordered.survival.data))
+  }
+  
+}
+
+get.cond.perm.surv <- function(clustering, subtype) {
+  surv.data = get.surv.data(clustering, subtype)
+  rownames(surv.data) = surv.data[,1]
+  surv.data = surv.data[,-1]
+  get.cond.perm.surv.given.data(surv.data)
+}
+
+
+################### Simulation code #####################
+
+run.simulations.with.rate <- function(survival.rates, sim.name) {
+  print('equal followup')
+  
+  print(run.simulations.spec.params(c(5, 5), c(0, 0), survival.rates, sim.ind1=sim.name, sim.ind2=1))
+  print(run.simulations.spec.params(c(100, 100), c(0.04, 0.04), survival.rates, sim.ind1=sim.name, sim.ind2=2))
+
+  print('unequal followup')
+  print(run.simulations.spec.params(c(5, 5), c(0, 0.04), survival.rates, sim.ind1=sim.name, sim.ind2=3))
+  print(run.simulations.spec.params(c(100, 100), c(0, 0.04), survival.rates, sim.ind1=sim.name, sim.ind2=4))
+}
+
+run.multi.group.simulations.with.rate <- function(survival.rates, sim.name) {
+  print('equal followup')
+  
+  print(run.simulations.spec.params(c(100, 100, 100, 100), c(0.04, 0.04, 0.04, 0.04), survival.rates, sim.ind1=sim.name, sim.ind2=1))
+  print(run.simulations.spec.params(c(20, 70, 130, 180), c(0.04, 0.04, 0.04, 0.04), survival.rates, sim.ind1=sim.name, sim.ind2=2))
+  
+  print('unequal followup')
+  print(run.simulations.spec.params(c(100, 100, 100, 100), c(0, 0, 0.04, 0.04), survival.rates, sim.ind1=sim.name, sim.ind2=3))
+  
+  print(run.simulations.spec.params(c(20, 70, 130, 180), c(0.08, 0.04, 0.04, 0), survival.rates, sim.ind1=sim.name, sim.ind2=4))
+  print(run.simulations.spec.params(c(20, 70, 130, 180), c(0, 0.04, 0.04, 0.08), survival.rates, sim.ind1=sim.name, sim.ind2=5))
+}
+
+run.simulations <- function() {
+  run.simulations.with.rate(c(0.04, 0.04), 1)
+  run.simulations.with.rate(c(0.04, 0.08), 2)
+  run.simulations.with.rate(c(0.08, 0.04), 3)
+
+  run.multi.group.simulations.with.rate(c(0.04, 0.04, 0.04, 0.04), 4)
+  run.multi.group.simulations.with.rate(c(0.04, 0.04, 0.04, 0.08), 5)
+  run.multi.group.simulations.with.rate(c(0.08, 0.04, 0.04, 0.04), 6)
+
+  clusternomics.cluster.sizes = CLUSTERNOMICS.CLUSTER.SIZES
+  num.clusters = length(clusternomics.cluster.sizes)
+  print(run.simulations.spec.params(clusternomics.cluster.sizes, runif(num.clusters, 0, 0.04), rep(0.04, num.clusters), sim.ind1=7, sim.ind2=1))
+  print(run.simulations.spec.params(clusternomics.cluster.sizes, runif(num.clusters, 0, 0.04), runif(num.clusters, 0.04, 0.08), sim.ind1=8, sim.ind2=1))
+  
+  mkl.lung.sizes = c(36, 40, 16, 43, 72, 134)
+  num.clusters2 = length(mkl.lung.sizes)
+  print(run.simulations.spec.params(mkl.lung.sizes, runif(num.clusters2, 0, 0.04), rep(0.04, num.clusters2), sim.ind1=7, sim.ind2=2))
+  print(run.simulations.spec.params(mkl.lung.sizes, runif(num.clusters2, 0, 0.04), runif(num.clusters2, 0.04, 0.08), sim.ind1=8, sim.ind2=2))
+}
+
+# 1.3e4 permutations guarantee that for a binom variable with p=0.05, the 99% confidence interval will be < 0.01.
+run.simulations.spec.params <- function(group.sizes, follow.up.rates, survival.rates, num.sims=1.3e4, sim.ind1=1, sim.ind2=1) {
+        sim.dir = get.sim.results.dir()
+        sim.path = file.path(sim.dir, paste0(sim.ind1, '_', sim.ind2))
+        if (!file.exists(sim.path)) {
+	  all.pvals = do.call(rbind, lapply(1:num.sims, function(i) {
+                  set.seed(1e5 + i)
+                print(paste('sim num', i))
+	  	sim.data = simulate.data(group.sizes, follow.up.rates, survival.rates)
+	  	cond.perm.pval = get.cond.perm.surv.given.data(sim.data, 1e3)$pvalue
+                cond.asym.pval = get.cond.asym.surv.given.data(sim.data)
+
+	  	return(c(cond.perm.pval, cond.asym.pval))
+	  }))
+          save(all.pvals, file=sim.path)
+        }
+        load(sim.path) 
+        sig.threshold = 0.05
+        return(colSums(all.pvals < sig.threshold) / num.sims)
+}
+
+simulate.data <- function(group.sizes, follow.up.rates, survival.rates, accrual.follow.up.range=c(12, 60)) {
+  ngroups = length(group.sizes)
+  sim.data = do.call(rbind, lapply(1:ngroups, function(i) {
+    size = group.sizes[i]
+        if (follow.up.rates[i] == 0) {
+	  follow.up.times = rep(Inf, size)
+        } else {
+	  follow.up.times = rexp(size, follow.up.rates[i])
+        }
+	accrual.follow.up.times = runif(size, accrual.follow.up.range[1], accrual.follow.up.range[2])
+	survival.times = rexp(size, survival.rates[i])
+	obs.time = pmin(survival.times, follow.up.times, accrual.follow.up.times)
+	cens = ifelse(survival.times < follow.up.times & survival.times < accrual.follow.up.times, 1, 0)
+	ret = data.frame(Survival=obs.time, Death=cens, cluster=i)
+	return(ret)
+  }))
+  return(sim.data)
+}
+
+
+
+
+###### Real data runs #######
 
 
 get.all.logranks = function() {
@@ -23,32 +212,37 @@ get.all.logranks = function() {
   results.path = get.clustering.results.dir.path()
   for (i in 1:length(SUBTYPES.DATA)) {
     for (j in 1:length(ALGORITHM.NAMES)) {
-      results.ret = get.clustering.results.file.path(SUBTYPES.DATA[[i]]$name, ALGORITHM.NAMES[[j]])
+      subtype.name = SUBTYPES.DATA[[i]]$name
+      algorithm.name = ALGORITHM.NAMES[[j]]
+      results.ret = get.clustering.results.file.path(subtype.name, algorithm.name)
       # load solution
       clustering.file.name = results.ret$clustering
       
       survival.file.name = results.ret$surv
       load(survival.file.name)
-      all.empirical.logrank[i, j] = empirical.surv.ret$pvalue
-      lower.conf[i, j] = empirical.surv.ret$conf.int[1]
-      upper.conf[i, j] = empirical.surv.ret$conf.int[2]
 
       load(clustering.file.name)
-      cur.survdiff = check.survival(clustering, SUBTYPES.DATA[[i]]$name)
+      cur.survdiff = check.survival(clustering, subtype.name)
       all.approx.logrank[i, j] = get.logrank.pvalue(cur.survdiff)
-      
-      #if (all.approx.logrank[i, j] == 0) {
-      #  all.approx.logrank[i, j] = 1e-10
-      #}
+
+      emp.res.path = get.empirical.pvalue.path(subtype.name, algorithm.name)
+      if (!file.exists(emp.res.path)) {
+        ret = get.cond.perm.surv(clustering, subtype.name)
+        save(ret, file=emp.res.path)
+      }
+      load(emp.res.path)
+      all.empirical.logrank[i, j] = ret$pvalue
+      lower.conf[i, j] = ret$conf.int[1]
+      upper.conf[i, j] = ret$conf.int[2]
     }
   }
-  return(list(appr=all.approx.logrank, empirical=all.empirical.logrank,  lower_conf=lower.conf, upper_conf=upper.conf))
+  return(list(appr=all.approx.logrank, empirical=all.empirical.logrank,
+              lower_conf=lower.conf, upper_conf=upper.conf))
 }
 
 
 plot.fig.a = function(all.logranks) {
   all.long.logranks = lapply(all.logranks, melt)
-  # TODO: probably move to a different function
   num.out.of.conf = sum(all.long.logranks$lower_conf$value > all.long.logranks$appr$value | all.long.logranks$upper_conf$value < all.long.logranks$appr$value)
   print(paste0('approximations outside their confidence intervals: ', num.out.of.conf))
   num.appr.more.sig = sum(all.long.logranks$lower_conf$value > all.long.logranks$appr$value)
@@ -81,22 +275,32 @@ plot.fig.a = function(all.logranks) {
   abline(a=0, b=1)
   segments(-log10(all.long.logranks$appr$value), -log10(all.long.logranks$upper_conf$value), -log10(all.long.logranks$appr$value), -log10(all.long.logranks$lower_conf$value), col=ifelse(dif > log10(2), 'red', 'black'))
   dev.off()
-  
-  
 }
 
 
 get.empirical.pvalue.distrib = function(clustering, subtype, num.perms=1e6) {
-  perm.chisq = as.numeric(mclapply(1:num.perms, function(i) {
+  surv.data = get.surv.data(clustering, subtype)
+  rownames(surv.data) = surv.data[,1]
+  surv.data = surv.data[,-1]
+  nsamples = nrow(surv.data)
+  imp = imputeHeinze(surv.data)
+  perm.pvals = as.numeric(mclapply(1:num.perms, function(i) {
       if (i %% 1e4 == 1) print(i)
-      cur.clustering = sample(clustering)
-      names(cur.clustering) = names(clustering)
-      cur.chisq = check.survival(cur.clustering, subtype)$chisq
-      return(cur.chisq)
+      perm = sample(1:nsamples, nsamples)
+      perm.data = permuteHeinze(imp, perm)
+      surv.ret = survdiff(Surv(Survival, Death) ~ cluster, data=perm.data)
+      cur.pvalue = get.logrank.pvalue(surv.ret)
+      return(cur.pvalue)
     }, mc.cores=50))
-  return(perm.chisq)
+  return(perm.pvals)
 }
 
+plot.kaplan.meier.curve <- function(surv.data, plot.path) {
+  surv.ret = survfit(Surv(Survival, Death) ~ cluster, data=surv.data)
+  png(plot.path, width=1800, height=1800, res=300)
+  plot(surv.ret, ylab='Survival', xlab='Days', col=rainbow(length(table(surv.data$cluster))))
+  dev.off()
+}
 
 plot.fig.b = function(subtype, alg.name) {
 
@@ -105,22 +309,21 @@ plot.fig.b = function(subtype, alg.name) {
   cluster.file.path = subtype.file.paths$clustering
   load(cluster.file.path)
   load(surv.file.path)
-  orig.chisq = check.survival(clustering, subtype)$chisq
+  orig.pval = get.logrank.pvalue(check.survival(clustering, subtype))
   num.perms = 1e6
   
+  surv.data = get.surv.data(clustering, subtype)
+  plot.kaplan.meier.curve(surv.data, file.path(get.figure.dir(), 'mcca_km.png'))
+  
   results.path = get.clustering.results.dir.path()
-  distrib.path = file.path(results.path, 'perm_chisq_values')
+  distrib.path = file.path(results.path, 'perm_pvals')
   if (!file.exists(distrib.path)) {
-    perm.chisq = get.empirical.pvalue.distrib(clustering, subtype, num.perms)
-    save(perm.chisq, file=distrib.path)
+    perm.pvalues = get.empirical.pvalue.distrib(clustering, subtype, num.perms)
+    save(perm.pvalues, file=distrib.path)
   } else {
     load(distrib.path)
   }
   
-  
-  perm.pvalues = (sapply(perm.chisq, function(chisq) {
-    1 - pchisq(chisq, max(clustering) - 1)
-  }))
   # plot the distribution of approx p.values  
   #plot(density(perm.pvalues))
   print(sum(perm.pvalues <= 0.05))
@@ -138,8 +341,7 @@ plot.fig.b = function(subtype, alg.name) {
   
 }
 
-
-calc.empirical.significance.prob = function(clustering, subtype) {
+calc.empirical.significance.prob = function(clustering, subtype, orig.pvalue=0.05) {
   should.continue = T
   total.num.perms = 0
   total.num.sig.pvalue = 0
@@ -155,7 +357,7 @@ calc.empirical.significance.prob = function(clustering, subtype) {
     }, mc.cores=50))
     
     total.num.perms = total.num.perms + num.perms
-    total.num.sig.pvalue = total.num.sig.pvalue + sum(perm.pvalues <= 0.05)
+    total.num.sig.pvalue = total.num.sig.pvalue + sum(perm.pvalues <= orig.pvalue)
     
     binom.ret = binom.test(total.num.sig.pvalue, total.num.perms)
     cur.pvalue = binom.ret$estimate
@@ -177,7 +379,7 @@ plot.fig.c = function(subtype) {
   
   load(get.clustering.results.file.path(subtype, 'mcca')$clustering)
   patient.names = names(clustering)
-  diff.num.clusters.dir = file.path(get.clustering.results.dir.path(), 'different_num_clusters')
+  diff.num.clusters.dir = file.path(get.clustering.results.dir.path(), 'different_num_clusters_exact')
   dir.create(diff.num.clusters.dir)
   
   max.num.clusters = 20
@@ -221,14 +423,23 @@ create.letter.results = function() {
 murine.analysis = function() {
   paper.groups = c(rep(1, 8), rep(2, 8))
   names(paper.groups) = paste0('MOUSE.', 1:16)
-  print(get.empirical.surv(paper.groups, 'mouse_analysis'))
-  
+  surv.data = get.surv.data(paper.groups, 'mouse_test')
+  surv.data$cluster = as.factor(surv.data$cluster)
+  mid.ranks.pvalue = coin::pvalue(coin::logrank_test(Surv(Survival, Death) ~ cluster, data=surv.data, ties.method='mid-ranks', distribution='exact'))
+  hothorn.pvalue = coin::pvalue(coin::logrank_test(Surv(Survival, Death) ~ cluster, data=surv.data, ties.method='Hothorn', distribution='exact'))
+  ave.scores.pvalue = coin::pvalue(coin::logrank_test(Surv(Survival, Death) ~ cluster, data=surv.data, ties.method='average', distribution='exact'))
+  asym.pvalue = get.logrank.pvalue(survdiff(Surv(Survival, Death) ~ cluster, data=surv.data))
+  print(c(mid.ranks.pvalue, hothorn.pvalue, ave.scores.pvalue, asym.pvalue))
 }
 
+CLUSTERNOMICS.CLUSTER.SIZES = c(63, 58, 40, 31, 29, 25, 20, 19, 16, 10,  9,  9,  7,  5,  4,  3)
 
 clusternomics.analysis = function() {
   
-  cluster.sizes = c(63, 58, 40, 31, 29, 25, 20, 19, 16, 10,  9,  9,  7,  5,  4,  3)
+  subtype = 'breast_clusternomics'
+  cluster.sizes = CLUSTERNOMICS.CLUSTER.SIZES
+  survival.file.path = get.subtype.survival.path(subtype)
+  ids = as.character(read.table(survival.file.path, header=T)[,1])
 
   clustering = c()
   for (i in seq_along(cluster.sizes)) {
@@ -236,49 +447,8 @@ clusternomics.analysis = function() {
   }
   names(clustering) = ids
   orig.pvalue = 0.0381
-  subtype = 'breast_clusternomics'
-    
   
   set.seed(42)
-  # The initial number of permutations to run
-  num.perms = round(min(max(10 / orig.pvalue, 1000), 1e6))
-  should.continue = T
-  
-  total.num.perms = 0
-  total.num.extreme.perms = 0
-  
-  while (should.continue) {
-    print('Another iteration in empirical survival calculation')
-    print(num.perms)
-    perm.pval = as.numeric(mclapply(1:num.perms, function(i) {
-      cur.clustering = sample(clustering)
-      names(cur.clustering) = names(clustering)
-      cur.pval = get.logrank.pvalue(check.survival(cur.clustering, subtype))
-      return(cur.pval)
-    }, mc.cores=1))
-    
-    total.num.perms = total.num.perms + num.perms
-    total.num.extreme.perms = total.num.extreme.perms + sum(perm.pval <= orig.pvalue)
-    
-    binom.ret = binom.test(total.num.extreme.perms, total.num.perms)
-    cur.pvalue = binom.ret$estimate
-    cur.conf.int = binom.ret$conf.int
-    
-    print(c(total.num.extreme.perms, total.num.perms))
-    print(cur.pvalue)
-    print(cur.conf.int)
-    
-    sig.threshold = 0.05
-    is.conf.small = ((cur.conf.int[2] - cur.pvalue) < min(cur.pvalue / 10, 0.01)) & ((cur.pvalue - cur.conf.int[1]) < min(cur.pvalue / 10, 0.01))
-    is.threshold.in.conf = cur.conf.int[1] < sig.threshold & cur.conf.int[2] > sig.threshold
-    if ((is.conf.small & !is.threshold.in.conf) | (total.num.perms > 2e7)) {
-      should.continue = F
-    } else {
-      num.perms = 1e2
-    }
-  }
-  
-  print(list(pvalue = cur.pvalue, conf.int = cur.conf.int, total.num.perms=total.num.perms, 
-                total.num.extreme.perms=total.num.extreme.perms))
-  
+  ret.cond = calc.empirical.significance.prob(clustering, subtype, orig.pvalue=orig.pvalue)
+  print(ret.cond)
 }
