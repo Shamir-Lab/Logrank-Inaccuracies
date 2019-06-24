@@ -3,6 +3,7 @@ This repository contains code to reproduce the results presented in "Inaccuracy 
 
 The implementation of the permutation-based method to compute the exact log-rank p-value is based on code from the permGS R package:
 https://cran.r-project.org/web/packages/permGS/index.html.
+It requires to install the R survival package, and to load the parallel package.
 
 The data needed to reproduce the TCGA analyses are here: http://acgt.cs.tau.ac.il/multi_omic_benchmark/download.html.
 
