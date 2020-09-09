@@ -49,7 +49,7 @@ get.cond.asym.surv.given.data <- function(surv.data) {
   if ((length(death.times) == 0) || (all(death.times == death.times[1]) & (death.times[1] == max.event.time))) {
     return(1)
   } else {
-    surv.ret = survival::survdiff(Surv(Survival, Death) ~ cluster, data=surv.data)
+    surv.ret = survival::survdiff(survival::Surv(Survival, Death) ~ cluster, data=surv.data)
     return(get.logrank.pvalue(surv.ret))
   }
 }
@@ -346,14 +346,14 @@ imputeHeinze <- function(data) {
 
   tmax <- max(time)
 
-  surv.fit <- survfit(Surv(time, status) ~ 1)
+  surv.fit <- survival::survfit(survival::Surv(time, status) ~ 1)
   cen.fit.list = lapply(1:ngroups, function(g) {
     g.ind = data[,3] == g
     gdata = data[g.ind,]
     cur.time <- gdata[,1]
     cur.status <- gdata[,2]
 
-    cen.fit <- survfit(Surv(cur.time, 1-cur.status) ~ 1)
+    cen.fit <- survival::survfit(survival::Surv(cur.time, 1-cur.status) ~ 1)
     return(cen.fit)
   })
 
