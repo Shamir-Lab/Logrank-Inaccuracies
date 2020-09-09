@@ -38,18 +38,18 @@ You can contact me at nimrodrap@gmail.com.
 # Citation
 
     @article{Rappoport2019,
-    abstract = {The log-rank test statistic is very broadly used in biology. Unfortunately, P-values  based on the popular chi-square approximation are often inaccurate and can be misleading.},
-    author = {Rappoport, Nimrod and Shamir, Ron},
-    doi = {10.15252/msb.20188754},
-    issn = {1744-4292},
-    journal = {Molecular Systems Biology},
-    month = {aug},
-    number = {8},
-    publisher = {EMBO},
-    title = {{Inaccuracy of the log‐rank approximation in cancer data analysis}},
-    url = {https://onlinelibrary.wiley.com/doi/abs/10.15252/msb.20188754},
-    volume = {15},
-    year = {2019}
+        abstract = {The log-rank test statistic is very broadly used in biology. Unfortunately, P-values  based on the popular chi-square approximation are often inaccurate and can be misleading.},
+        author = {Rappoport, Nimrod and Shamir, Ron},
+        doi = {10.15252/msb.20188754},
+        issn = {1744-4292},
+        journal = {Molecular Systems Biology},
+        month = {aug},
+        number = {8},
+        publisher = {EMBO},
+        title = {{Inaccuracy of the log‐rank approximation in cancer data analysis}},
+        url = {https://onlinelibrary.wiley.com/doi/abs/10.15252/msb.20188754},
+        volume = {15},
+        year = {2019}
     }
 
 
