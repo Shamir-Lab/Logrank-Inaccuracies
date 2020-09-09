@@ -33,7 +33,7 @@ The data needed to reproduce the TCGA analyses are here: http://acgt.cs.tau.ac.i
 The data needed to reproduce the clusternomics and murine model of endotoxemia are available in this repository.
 
 # Contact
-You can contact me at nimrodrap@gmail.com.
+You can contact me at nimrodrap at gmail dot com.
 
 # Citation
 
