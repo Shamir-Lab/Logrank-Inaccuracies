@@ -9,4 +9,7 @@ Description: Implementation of Heinze's conditional log-rank test for >= 2 group
 License: GPL3
 Encoding: UTF-8
 LazyData: true
+Imports:
+  survival,
+  formula.tools
 RoxygenNote: 7.0.2
